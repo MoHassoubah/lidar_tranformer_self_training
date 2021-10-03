@@ -1,0 +1,164 @@
+# This file is covered by the LICENSE file in the root of this project.
+name: "nuscenes"
+labels: 
+  0 : "noise"
+  1 : "animal"
+  2 : "adult"
+  3 : "child"
+  4 : "construction_worker"
+  5 : "personal_mobility"
+  6 : "police_officer"
+  7 : "stroller"
+  8 : "wheelchair"
+  9 : "barrier"
+  10: "debris"
+  11: "pushable_pullable"
+  12: "trafficcone"
+  13: "bicycle_rack"
+  14: "bicycle"
+  15: "bus-bendy"
+  16: "bus-rigid"
+  17: "car"
+  18: "vehicle-construction"
+  19: "vehicle-ambulance"
+  20: "vehicle-police"
+  21: "motorcycle"
+  22: "trailer"
+  23: "truck"
+  24: "flat-driveable_surface"
+  25: "flat-other"
+  26: "sidewalk"
+  27: "terrain"
+  28: "static-manmade"
+  29: "static-other"
+  30: "vegetation"
+  31: "vehicle-ego"
+color_map: # bgr
+  0 : [0, 0, 0]
+  1 : [0, 0, 255]
+  17: [245, 150, 100]
+  14: [245, 230, 100]
+  13: [250, 80, 100]
+  21: [150, 60, 30]
+  16: [255, 0, 0]
+  23: [180, 30, 80]
+  15: [255, 0, 0]
+  2: [30, 30, 255]
+  24: [255, 0, 255]
+  26: [75, 0, 75]
+  25: [75, 0, 175]
+  28: [0, 200, 255]
+  9: [50, 120, 255]
+  52: [0, 150, 255]
+  60: [170, 255, 150]
+  30: [0, 175, 0]
+  22: [0, 60, 135]
+  27: [80, 240, 150]
+  12: [0, 0, 255]
+  99: [255, 255, 50]
+  252: [245, 150, 100]
+  256: [255, 0, 0]
+  253: [200, 40, 255]
+  254: [30, 30, 255]
+  255: [90, 30, 150]
+  257: [250, 80, 100]
+  258: [180, 30, 80]
+  259: [255, 0, 0]
+content: # as a ratio with the total number of points
+  0: 0.0017384095101997325039
+  1: 4.5417887886339314120e-6
+  2: 0.0018187987500511446744
+  3: 8.1431700565015056236e-6
+  4: 1.1760829230333914538e-4
+  5: 7.3571074472151873179e-6
+  6: 7.7248363073534220618e-6
+  7: 7.4296411214626372903e-6
+  8: 1.0262671491197340282e-5
+  9: 0.0078480642725813049184
+  10: 5.639155806812503029e-5
+  11: 6.061124673821127398e-4
+  12: 6.209548813287013981e-4
+  13: 1.375828854103433046e-4
+  14: 1.192175277738523377e-4
+  15: 3.014895906687931335e-4
+  16: 0.003582233221281064249
+  17: 0.032137662888366208608
+  18: 0.001277279206416019796
+  19: 1.870694063730744637e-6
+  20: 5.025908893494818437e-5
+  21: 3.604679019801382692e-4
+  22: 0.004139067491160203041
+  23: 0.013360857984706581787
+  24: 0.267327831742981358292
+  25: 0.007218969594855369337
+  26: 0.059205578711303183579
+  27: 0.059283399753037345922
+  28: 0.150278018368414171787
+  29: 6.891964175732993599e-4
+  30: 0.103386861914182960721
+  31: 0.284290356069763603106
+# classes that are indistinguishable from single scan or inconsistent in
+# ground truth are mapped to their closest equivalent
+learning_map:
+  0 : 0     # "noise" mapped to "unlabeled" --------------------------mapped
+  1 : 0     # "animal" mapped to "unlabeled" --------------------------mapped
+  2 : 6     # "adult" mapped to "person" --------------------------mapped
+  3 : 6     # "child" mapped to "person" --------------------------mapped
+  4 : 6     # "construction_worker" mapped to "person" --------------------------mapped
+  5 : 6     # "personal_mobility" mapped to "person" --------------------------mapped
+  6 : 6     # "police_officer" mapped to "person" ---------------------mapped
+  7 : 0     # "stroller" mapped to "unlabeled" ---------------------mapped
+  8 : 0     # "wheelchair" mapped to "unlabeled" ---------------------mapped
+  9 : 11    # "barrier" mapped to "fence" ---------------------mapped
+  10: 0     # "debris" mapped to "unlabeled" ---------------------mapped
+  11: 0     # "pushable_pullable" mapped to "unlabeled" ---------------------mapped
+  12: 0    # "trafficcone" mapped to "unlabeled" ---------------------mapped
+  13: 0     # "bicycle_rack" mapped to "unlabeled" ---------------------mapped
+  14: 2     # "bicycle" mapped to "bicycle" ---------------------mapped
+  15: 5     # "bus-bendy" mapped to "other-vehicle" ---------------------mapped
+  16: 5     # "bus-rigid" mapped to "other-vehicle" ---------------------mapped
+  17: 1     # "car" mapped to "car" ---------------------mapped
+  18: 4     # "vehicle-construction" mapped to "truck" ------------------mapped
+  19: 5     # "vehicle-ambulance" to "other-vehicle" ---------------------------------mapped
+  20: 1     # "vehicle-police" to "car" ---------------------------------mapped
+  21: 3     # "motorcycle" to "motorcycle" ---------------------------------mapped
+  22: 5    # "trailer" to "other-vehicle" ---------------------------------mapped
+  23: 4     # "truck" to "truck" ---------------------------------mapped
+  24: 7     # "flat-driveable_surface" to "road" ---------------------------------mapped
+  25: 9    # "flat-other" to "other-ground" ----------------------------mapped
+  26: 8    # "sidewalk" to "sidewalk" ------------------------------------mapped
+  27: 13    # "terrain" to "terrain" ------------------------mapped
+  28: 10    # "static-manmade" to "building" ------------------------------mapped
+  29: 0     # "static-other" to "unlabeled" ------------------mapped
+  30: 12    # "vegetation" mapped to "vegetation" --------------mapped
+  31: 0     # "vehicle-ego" mapped to "unlabeled" -------------------mapped
+learning_map_inv: # inverse of previous map
+  0: 0      # "unlabeled", and others ignored
+  1: 17     # "car"
+  2: 14     # "bicycle"
+  3: 21     # "motorcycle"
+  4: 23     # "truck"
+  5: 15     # "other-vehicle"
+  6: 2      # "person"
+  7: 24     # "road"
+  8: 26    # "sidewalk"
+  9: 25    # "other-ground"
+  10: 28    # "building"
+  11: 9     # "fence"
+  12: 30    # "vegetation"
+  13: 27    # "terrain"
+learning_ignore: # Ignore classes
+  0: True      # "unlabeled", and others ignored
+  1: False     # "car"
+  2: False     # "bicycle"
+  3: False     # "motorcycle"
+  4: False     # "truck"
+  5: False     # "other-vehicle"
+  6: False     # "person"
+  7: False     # "road"
+  8: False    # "sidewalk"
+  9: False    # "other-ground"
+  10: False    # "building"
+  11: False    # "fence"
+  12: False    # "vegetation"
+  13: False    # "terrain"
