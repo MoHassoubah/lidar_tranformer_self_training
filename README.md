@@ -1,4 +1,5 @@
 # lidar_tranformer_self_training
+![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/arch.png)
 The code behind this paper "Study LiDAR segmentation and  model's uncertainty using Transformer for different self-trainings"
 Choose from:
 TransUnet architecture.
