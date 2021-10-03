@@ -1,33 +1,37 @@
 # lidar_tranformer_self_training
 ![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/arch.png)
 The code behind this paper "Study LiDAR segmentation and  model's uncertainty using Transformer for different self-trainings"
-Choose from:
-TransUnet architecture.
-TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder.
-TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture .
-SalsaNext network implementation
+## Study applied on architectures:
+* TransUnet architecture.
+* TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder.
+* TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture .
+* SalsaNext network implementation
 
-For evaluation the following commands are used,
+## For evaluation the following commands are used,
 
-  TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture,
+  ### TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture,
   
-python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>
+```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>```
 
   
-  SalsaNext network implementation,
+  ### SalsaNext network implementation,
   
-python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_salsa --evaluate_model --restore_from <file_name>
+```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_salsa --evaluate_model --restore_from <file_name>```
 
-   Use batch normalisation layer learnt from pre-training,
+   ### Use batch normalisation layer learnt from pre-training,
   
-python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --bn_pretrain --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>
+```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --bn_pretrain --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>```
   
-  TransUnet architecture,
+  ### TransUnet architecture,
   
-python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>
+```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>```
 
-  TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder,
+  ### TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder,
   
-python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --remove_Transformer --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>
+```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --remove_Transformer --evaluate_model --restore_from_dir <directory of saved the pre-trained weights> --restore_from <file_name>```
   
-Remove --evaluate_model for epistemic uncertainty evaluation.
+Remove ```$ --evaluate_model``` for epistemic uncertainty evaluation.
+  
+### Disclamer
+
+We based our code on [TranUnet](https://github.com/Beckschen/TransUNet), [RangeNet++](https://github.com/PRBonn/lidar-bonnetal), [SalsaNext](https://github.com/Halmstad-University/SalsaNext) and  [deep_uncertainty_estimation](https://github.com/uzh-rpg/deep_uncertainty_estimation) please go show some support!
