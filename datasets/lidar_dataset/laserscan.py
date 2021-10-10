@@ -7,8 +7,9 @@ from numpy.random import default_rng
 class LaserScan:
   """Class that contains LaserScan with x,y,z,r"""
   EXTENSIONS_SCAN = ['.bin']
-
-  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, nuscenes_dataset=False, pretrain=False, evaluate=False,drop_percentage=None):
+  
+  def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, nuscenes_dataset=False, pretrain=False, val_manipulation=False,\
+  evaluate=False,drop_percentage=None):
     self.project = project
     self.proj_H = H
     self.proj_W = W
@@ -16,6 +17,7 @@ class LaserScan:
     self.proj_fov_down = fov_down
     self.nuscenes_dataset = nuscenes_dataset
     self.pretrain = pretrain
+    self.val_manipulation = val_manipulation
     self.evaluate = evaluate
     self.drop_percentage = drop_percentage
     self.reset()
@@ -201,10 +203,15 @@ class LaserScan:
     return aug_points
             
   def do_random_rotation(self, aug_points):
-    self.rot_ang_around_z_axis = np.random.randint(0, 4) 
+    if self.val_manipulation:
+        self.rot_ang_around_z_axis = np.random.randint(0, 16) 
+        rot_resolution = 22.5
+    else:
+        self.rot_ang_around_z_axis = np.random.randint(0, 4) 
+        rot_resolution = 90 
     
     if self.rot_ang_around_z_axis:
-        theta = np.radians(self.rot_ang_around_z_axis*90)
+        theta = np.radians(self.rot_ang_around_z_axis*rot_resolution)
         c, s = np.cos(theta), np.sin(theta)
         R = np.array(((c,-s,0), (s,c,0),(0,0, 1)))
                 
@@ -311,8 +318,9 @@ class SemLaserScan(LaserScan):
   """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
   EXTENSIONS_LABEL = ['.label']
 
-  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, nuscenes_dataset=False, max_classes=300, pretrain=False, evaluate=False, drop_percentage=None):
-    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down, nuscenes_dataset,pretrain,evaluate,drop_percentage)
+  def __init__(self,  sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, nuscenes_dataset=False, \
+  max_classes=300, pretrain=False, val_manipulation=False, evaluate=False, drop_percentage=None):
+    super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down, nuscenes_dataset,pretrain, val_manipulation,evaluate,drop_percentage)
     self.reset()
 
     # make semantic colors

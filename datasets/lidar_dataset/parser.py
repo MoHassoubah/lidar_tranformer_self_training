@@ -36,10 +36,12 @@ class SemanticKitti(Dataset):
                gt=True,            # send ground truth?
                nuscenes_dataset=False,         # nuscebes dataset?
                pretrain=False,                  # use pretraining flag
+               val_manipulation=False,        #use for val augmentation in the NCE
                evaluate=False):                  # evaluate flag for noise and model uncertainity calculations  
     # save deats
     self.root = root #os.path.join(root, "sequences") #root
     self.pretrain = pretrain
+    self.val_manipulation = val_manipulation
     self.evaluate = evaluate
     self.drop_percentage = 0.2
     self.sequences = sequences
@@ -197,6 +199,7 @@ class SemanticKitti(Dataset):
                        fov_down=self.sensor_fov_down,
                        nuscenes_dataset=self.nuscenes_dataset,
                        pretrain= self.pretrain,
+                       val_manipulation= self.val_manipulation,
                        evaluate=self.evaluate,
                        drop_percentage=self.drop_percentage)
                        
@@ -282,7 +285,7 @@ class SemanticKitti(Dataset):
     if self.evaluate:
         return proj, proj_mask, proj_labels, reduced_proj, reduced_proj_mask, path_seq, path_name
     elif self.pretrain:
-        return proj, proj_mask, reduced_proj, reduced_proj_mask, scan.rot_ang_around_z_axis, path_seq, path_name
+        return index, proj, proj_mask, reduced_proj, reduced_proj_mask, scan.rot_ang_around_z_axis, path_seq, path_name
     else:
         return proj, proj_mask, proj_labels, unproj_labels, path_seq, path_name, proj_x, proj_y, proj_range, unproj_range, proj_xyz, unproj_xyz, proj_remission, unproj_remissions, unproj_n_points
         
@@ -414,6 +417,27 @@ class Parser():
                                                    drop_last=True)
       assert len(self.validloader) > 0
       self.validiter = iter(self.validloader)
+      
+      self.valid_NCE_dataset = SemanticKitti(root=self.root,
+                                   sequences=self.valid_sequences,
+                                   labels=self.labels,
+                                   color_map=self.color_map,
+                                   learning_map=self.learning_map,
+                                   learning_map_inv=self.learning_map_inv,
+                                   sensor=self.sensor,
+                                   max_points=max_points,
+                                   gt=self.gt,
+                                   nuscenes_dataset=self.nuscenes_dataset,
+                                   pretrain=self.pretrain,
+                                   val_manipulation=True)
+
+      self.validloader_NCE = torch.utils.data.DataLoader(self.valid_NCE_dataset,
+                                               batch_size=self.batch_size,
+                                               shuffle=False,
+                                               num_workers=self.workers,
+                                               pin_memory=True,
+                                               drop_last=True)
+      assert len(self.validloader_NCE) > 0
 
     if self.test_sequences:
       self.test_dataset = SemanticKitti(root=self.root,
@@ -440,6 +464,9 @@ class Parser():
     if self.valid_sequences:
         self.valid_dataset.set_eval_drop_percentage_dataset(drp_percentage)
 
+  def get_num_train_scans(self):
+    return self.train_dataset.__len__()
+    
   def get_train_batch(self):
     scans = self.trainiter.next()
     return scans
@@ -453,6 +480,9 @@ class Parser():
 
   def get_valid_set(self):
     return self.validloader
+
+  def get_valid_set_NCE(self):
+    return self.validloader_NCE
 
   def get_test_batch(self):
     scans = self.testiter.next()

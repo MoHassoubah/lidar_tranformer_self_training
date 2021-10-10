@@ -130,12 +130,12 @@ class Embeddings(nn.Module):
         img_size = _pair(img_size)
         self.num_tokens = 0
         
-        # if self.pretrain:
-            # self.num_tokens = 2
+        if self.pretrain:
+            self.num_tokens = 1
             # self.rot_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))###>
-            # # self.rot_axis_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))###>
-            # self.contrastive_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))###>
-            # self.ext_tok_pos_embeddings = nn.Parameter(torch.zeros(1, self.num_tokens, config.hidden_size))
+            # self.rot_axis_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))###>
+            self.contrastive_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))###>
+            self.ext_tok_pos_embeddings = nn.Parameter(torch.zeros(1, self.num_tokens, config.hidden_size))
 
         if config.patches.get("grid") is not None:   # ResNet
             grid_size = config.patches["grid"]
@@ -197,16 +197,16 @@ class Embeddings(nn.Module):
         # print(" self.position_embeddings")
         # print( self.position_embeddings.shape)
         
-        # if self.pretrain:
-            # B=x.shape[0]
+        if self.pretrain:
+            B=x.shape[0]
             # rot_token = self.rot_token.expand(B, -1, -1) 
-            # # rot_axis_token = self.rot_axis_token.expand(B, -1, -1) 
-            # contrastive_token = self.contrastive_token.expand(B, -1, -1) 
-            # x = torch.cat((rot_token,contrastive_token, x), dim=1) ###>
-            # all_pos_embeddings = torch.cat((self.ext_tok_pos_embeddings, self.position_embeddings), dim=1) ###>
-            # embeddings = x + all_pos_embeddings
-        # else:
-        embeddings = x + self.position_embeddings
+            # rot_axis_token = self.rot_axis_token.expand(B, -1, -1) 
+            contrastive_token = self.contrastive_token.expand(B, -1, -1) 
+            x = torch.cat((contrastive_token, x), dim=1) ###>
+            all_pos_embeddings = torch.cat((self.ext_tok_pos_embeddings, self.position_embeddings), dim=1) ###>
+            embeddings = x + all_pos_embeddings
+        else:
+            embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings, features,retain_size_2,retain_size_3
 
@@ -271,10 +271,11 @@ class Block(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, config, vis, pretrain=False):
+    def __init__(self, config, vis, low_dim=512, pretrain=False, contrastive=False):
         super(Encoder, self).__init__()
         self.vis = vis
         self.pretrain = pretrain
+        self.contrastive = contrastive
         self.layer = nn.ModuleList()
         self.encoder_norm = LayerNorm(config.hidden_size, eps=1e-6)
         
@@ -283,10 +284,10 @@ class Encoder(nn.Module):
             self.layer.append(copy.deepcopy(layer))
             
         
-        # if self.pretrain:
+        if self.contrastive:
             # self.rot_head = nn.Linear(config.hidden_size, 4) ###>
-            # # self.rot_axis_head = nn.Linear(config.hidden_size, 1) ###>
-            # self.contrastive_head = nn.Linear(config.hidden_size, 512) ###>
+            # self.rot_axis_head = nn.Linear(config.hidden_size, 1) ###>
+            self.contrastive_head = nn.Linear(config.hidden_size, low_dim) ###>
             
 
     def forward(self, hidden_states):
@@ -296,33 +297,35 @@ class Encoder(nn.Module):
             if self.vis:
                 attn_weights.append(weights)
         encoded = self.encoder_norm(hidden_states)
-        # if self.pretrain:
+        if self.contrastive:
             # x_rot = self.rot_head(encoded[:, 0])
-            # # x_rot_axis = self.rot_axis_head(encoded[:, 1])
-            # x_contrastive = self.contrastive_head(encoded[:, 1])###>
+            # x_rot_axis = self.rot_axis_head(encoded[:, 1])
+            x_contrastive = self.contrastive_head(encoded[:, 1])###>
             
-            # return x_rot, x_contrastive, encoded[:, 2:], attn_weights
+            return x_contrastive, encoded[:, 1:], attn_weights
             
         return encoded, attn_weights
 
 
 class Transformer(nn.Module):
-    def __init__(self, config, img_size, vis, rm_transformer=False, bn_pretrain=False,pretrain=False, use_tranunet_enc_dec=False, dropout_rate=0.2,eval_uncer=False):
+    def __init__(self, config, img_size, vis, low_dim=512, rm_transformer=False, bn_pretrain=False,pretrain=False, contrastive=False, \
+    use_tranunet_enc_dec=False, dropout_rate=0.2,eval_uncer=False):
         super(Transformer, self).__init__()
         self.pretrain = pretrain
+        self.contrastive=contrastive
         self.rm_transformer = rm_transformer
             
-        self.embeddings = Embeddings(config, img_size=img_size, bn_pretrain=bn_pretrain,pretrain=pretrain, use_tranunet_enc_dec=use_tranunet_enc_dec,\
+        self.embeddings = Embeddings(config, img_size=img_size, bn_pretrain=bn_pretrain,pretrain=contrastive, use_tranunet_enc_dec=use_tranunet_enc_dec,\
         dropout_rate=dropout_rate, eval_uncer=eval_uncer)
         if rm_transformer==False:
-            self.encoder = Encoder(config, vis,pretrain=pretrain)
+            self.encoder = Encoder(config, vis, low_dim=low_dim,pretrain=pretrain, contrastive=contrastive)
 
     def forward(self, input_ids):
         embedding_output, features,bfr_flat_size_2,bfr_flat_size_3 = self.embeddings(input_ids)
         # hybrid_output = embedding_output
-        # if self.pretrain:
-            # x_rot, x_contrastive, encoded, attn_weights = self.encoder(embedding_output)
-            # return x_rot, x_contrastive, encoded, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3
+        if self.contrastive:
+            x_contrastive, encoded, attn_weights = self.encoder(embedding_output)
+            return x_contrastive, encoded, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3
         
         if self.rm_transformer==False:
             encoded, attn_weights = self.encoder(embedding_output)  # (B, n_patch, hidden)
@@ -599,15 +602,16 @@ class DecoderCup_TransUnet(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False, rm_transformer=False, bn_pretrain=False, pretrain=False, \
-    use_tranunet_enc_dec=False, dropout_rate=0.2,eval_uncer=False):
+    def __init__(self, config, img_size=224, num_classes=21843, low_dim=512, zero_head=False, vis=False, rm_transformer=False, bn_pretrain=False, pretrain=False, \
+    contrastive=False, use_tranunet_enc_dec=False, dropout_rate=0.2,eval_uncer=False):
         super(VisionTransformer, self).__init__()
         self.pretrain = pretrain
+        self.contrastive = contrastive
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
-        self.transformer = Transformer(config, img_size, vis, rm_transformer=rm_transformer, bn_pretrain=bn_pretrain,\
-        pretrain=pretrain, use_tranunet_enc_dec=use_tranunet_enc_dec, dropout_rate=dropout_rate ,eval_uncer=eval_uncer)
+        self.transformer = Transformer(config, img_size, vis,low_dim=low_dim, rm_transformer=rm_transformer, bn_pretrain=bn_pretrain,\
+        pretrain=pretrain, contrastive=contrastive, use_tranunet_enc_dec=use_tranunet_enc_dec, dropout_rate=dropout_rate ,eval_uncer=eval_uncer)
         # if self.pretrain:
         if(use_tranunet_enc_dec):
             self.decoder = DecoderCup_TransUnet(config, dropout_rate=dropout_rate, eval_uncer=eval_uncer)
@@ -626,10 +630,10 @@ class VisionTransformer(nn.Module):
             )
             
             # create learnable parameters for the MTL task
-            self.rot_w = None#nn.Parameter(torch.tensor([1.0]))###>
-            # self.rot_axis_w = nn.Parameter(torch.tensor([1.0]))###>
-            self.contrastive_w = None#nn.Parameter(torch.tensor([1.0]))###>
-            self.recons_w = None#nn.Parameter(torch.tensor([1.0]))###>
+            if contrastive:
+                self.contrastive_w = nn.Parameter(torch.tensor([1.0]))###>
+                self.recons_w = nn.Parameter(torch.tensor([1.0]))###>
+                self.nce_converge_w = nn.Parameter(torch.tensor([1.0]))###>
         else:
             self.segmentation_head = SegmentationHead(
                 in_channels=in_chs,
@@ -643,10 +647,10 @@ class VisionTransformer(nn.Module):
             #if x size was 2x2 then the output of the repeat(1,3,1,1) is 1x3x2x2
             x = x.repeat(1,3,1,1)# 1st size of x is repeated by 1, 2nd size of x is repeated by 3, 3rd and 4th size of x is repeated by 1
             
-        # if self.pretrain:
-            # x_rot, x_contrastive, x, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3 = self.transformer(x)  # (B, n_patch, hidden)
-        # else:
-        x, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3 = self.transformer(x)  # (B, n_patch, hidden)
+        if self.contrastive:
+            x_contrastive, x, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3 = self.transformer(x)  # (B, n_patch, hidden)
+        else:
+            x, attn_weights, features,bfr_flat_size_2,bfr_flat_size_3 = self.transformer(x)  # (B, n_patch, hidden)
         # print("x in vision transformer")
         # print(x.size())
         # if self.pretrain:
@@ -655,7 +659,11 @@ class VisionTransformer(nn.Module):
             # x = self.decoder_finetune(x,bfr_flat_size_2,bfr_flat_size_3, features)
         if self.pretrain:
             logits = self.recon_head(x)
-            return logits, self.rot_w, self.contrastive_w, self.recons_w
+            if self.contrastive:
+                return x_contrastive, logits, self.contrastive_w, self.recons_w, self.nce_converge_w
+            else:
+                return logits, None, None, None
+            # return logits, self.rot_w, self.contrastive_w, self.recons_w
         else:
             logits = self.segmentation_head(x)
             return logits

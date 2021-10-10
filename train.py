@@ -54,9 +54,19 @@ parser.add_argument('--vit_patches_size', type=int,
                     default=16, help='vit_patches_size, default is 16')
 
 parser.add_argument('--pretrain', action='store_true', default=False, help='Enabling pretraining')
+parser.add_argument('--contrastive', action='store_true', default=False, help='Enabling contrastive learning')
 parser.add_argument('--use_salsa', action='store_true', default=False, help='use salsaNext module')
+parser.add_argument('--train_fr_scratch', action='store_true', default=False, help='not use pre-trained model')
 parser.add_argument('--use_transunet_enc_dec', action='store_true', default=False, help='use the decoder and encoder blocks from the TransUnet architecture else use those from salsaNext architecture')
 parser.add_argument('--remove_Transformer', action='store_true', default=False, help='remove the Transformer from the architecture')
+parser.add_argument('--low-dim', default=300, type=int,
+                    metavar='D', help='feature dimension')
+parser.add_argument('--nce-k', default=4096, type=int, #default=4096
+                    metavar='K', help='number of negative samples for NCE')
+parser.add_argument('--nce-t', default=0.07, type=float, 
+                    metavar='T', help='temperature parameter for softmax')
+parser.add_argument('--nce-m', default=0.5, type=float,
+                    help='momentum for non-parametric updates')  
 parser.add_argument(
   '--data_kitti_cfg', '-dck',
   type=str,
@@ -201,10 +211,10 @@ if __name__ == "__main__":
         net = SalsaNext(kitti_parser.get_n_classes()).cuda()
     else:
         #after the '\' avoid adding any characters as this would raise error
-        net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes,rm_transformer=args.remove_Transformer,\
-        bn_pretrain=args.pretrain, pretrain=args.pretrain, use_tranunet_enc_dec=args.use_transunet_enc_dec, dropout_rate=0.2, eval_uncer=True).cuda()
+        net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes, low_dim=args.low_dim,rm_transformer=args.remove_Transformer,\
+        bn_pretrain=args.pretrain, pretrain=args.pretrain, contrastive=args.contrastive, use_tranunet_enc_dec=args.use_transunet_enc_dec, dropout_rate=0.2, eval_uncer=True).cuda()
     
-    if args.pretrain or args.use_salsa:
+    if args.pretrain or args.use_salsa or args.train_fr_scratch:
         net.apply(weights_init)
     else:
         # net.load_from(weights=np.load(config_vit.pretrained_path))

@@ -29,6 +29,93 @@ from matplotlib import pyplot as plt
 from networks.Lovasz_Softmax import Lovasz_softmax
 from warmupLR import *
 
+from NCE.NCEAverage import NCEAverage
+
+from torch.nn import functional as F
+
+
+def NN(epoch, net,lower_dim, NCE_valLoader, valLoader):
+    net.eval()
+    net_time = AverageMeter()
+    cls_time = AverageMeter()
+    losses = AverageMeter()
+    correct = 0.
+    total = 0
+    
+    device = torch.device("cuda")
+    testsize = valLoader.dataset.__len__()
+    valNCEsize = NCE_valLoader.dataset.__len__()
+    
+    trainFeatures=torch.zeros((lower_dim,valNCEsize)).cuda()
+    indicies = torch.zeros(valNCEsize).cuda()
+    lossF = torch.nn.L1Loss()
+    
+    val_losses = AverageMeter()
+    print("####################################passed the allocation ")
+    
+    temploader = torch.utils.data.DataLoader(NCE_valLoader.dataset, batch_size=10, shuffle=False, num_workers=1)
+    
+    with torch.no_grad():
+        for batch_idx, batch_data in enumerate(temploader):
+            if batch_idx % 100 == 0:
+                print('%d NCE db iter processd' % batch_idx)
+            
+            (index, image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, path_seq, path_name) =  batch_data
+            
+            reduced_image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
+            index = index.cuda()
+            
+            batchSize = reduced_image_batch.size(0)
+            features, _, _, _,_  = net(reduced_image_batch)#features of the training data with the transform of the testing data
+            trainFeatures[:, batch_idx*batchSize:batch_idx*batchSize+batchSize] = features.data.t()
+            indicies[batch_idx*batchSize:batch_idx*batchSize+batchSize] = index
+        
+        print("####################################pass teh first for loop")
+        end = time.time()
+        for  batch_idx, batch_data in enumerate(valLoader):
+            (index, image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, path_seq, path_name) =  batch_data
+        
+            image_batch = image_batch.to(device, non_blocking=True)
+            reduced_image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
+            index = index.cuda()
+            
+            batchSize = reduced_image_batch.size(0)
+            features, recon_prd, _, _ ,_  = net(reduced_image_batch)#features of the training data with the transform of the testing data
+            
+            loss_v = lossF(recon_prd, image_batch)
+            val_losses.update(loss_v.mean().item(), batchSize)
+            
+            net_time.update(time.time() - end)
+            end = time.time()
+            #features dim=(batchsize,lower_dim) * trainFeatures dim=(lower_dim,#samples in dataset)-> result dim=(batchsize, #samples in dataset)
+            dist = torch.mm(features, trainFeatures)
+
+            #(values yd, indices yi)
+            yd, yi = dist.topk(1, dim=1, largest=True, sorted=True)#Returns the k largest elements of the given input tensor along a given dimension.
+
+            total += batchSize
+            
+            # start_index = (index*500)+index
+            # correct += torch.logical_and(start_index <= yi, (start_index +500) >=yi).sum().item()
+            
+            correct += torch.logical_and(index -2 <= yi, (index +2) >=yi).sum().item()
+            # correct += index.eq(yi.data).sum().item()
+            
+            cls_time.update(time.time() - end)
+            end = time.time()
+
+            print('Test [{}/{}]\t'
+                  'Net Time {net_time.val:.3f} ({net_time.avg:.3f})\t'
+                  'Cls Time {cls_time.val:.3f} ({cls_time.avg:.3f})\t'
+                  'Top1: {:.2f}'.format(
+                  total, testsize, correct*100./total, net_time=net_time, cls_time=cls_time))
+            # print("index")
+            # print(index)
+            # print("yi.data")
+            # print(yi.data)
+
+    return correct*100./total, val_losses
+
 
 
 def get_mpl_colormap(cmap_name):
@@ -103,7 +190,7 @@ def save_img(depth_gt, depth_gt_reduced, depth_pred, proj_mask, proj_mask_reduce
 
 
     
-def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=None):
+def trainer_kitti(args, model, snapshot_path, parser,ARCH=None,DATA=None):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
@@ -122,7 +209,8 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
     trainloader = parser.get_train_set()#DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)#,
                              #worker_init_fn=worker_init_fn) #this gave the error Can't pickle local object 'trainer_synapse.<locals>.worker_init_fn'
     
-    ########################                         
+    ########################   
+    NCEvalid_loader = parser.get_valid_set_NCE()
     valid_loader = parser.get_valid_set()
     device = torch.device("cuda")
     ignore_classes = [0]
@@ -152,14 +240,20 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
     ######################
     ######################
     if args.pretrain:
-        criterion = MTL_loss(device, args.batch_size)
+        if args.contrastive:
+            train_data_size = parser.get_num_train_scans()
+            # nce-k 4096 --nce-t 0.07 --nce-m 0.5 --low-dim 128
+            lemniscate = NCEAverage(args.low_dim, train_data_size, args.nce_k, args.nce_t, args.nce_m).cuda()
+            criterion = MTL_loss(device, args.batch_size, ndata=train_data_size, contrastive_loss=True)
+        else:
+            criterion = MTL_loss(device, args.batch_size)
     ######################
     
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     ls = Lovasz_softmax(ignore=0).to(device)
     
-    if(use_salsa):
+    if(args.use_salsa):
         epsilon_w = ARCH["train"]["epsilon_w"]
         content = torch.zeros(parser.get_n_classes(), dtype=torch.float)
         for cl, freq in DATA["content"].items():
@@ -209,34 +303,61 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
           
         for i_batch, batch_data in enumerate(trainloader):
             if args.pretrain:
-                (image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, \
+                (index, image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, \
                 rot_ang_around_z_axis_batch,path_seq, path_name) =  batch_data
             
-                image_batch = image_batch.to(device, non_blocking=True)
-                # reduced_image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
+                if args.use_transunet_enc_dec:
+                    image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
+                else:
+                    image_batch = image_batch.to(device, non_blocking=True)
+                index = index.cuda()
                 
                 with torch.cuda.amp.autocast():
-                
-                    recon_prd, rot_w, contrastive_w, recons_w = model(image_batch)
+                    if args.contrastive:
+                        contrastive_prd, recon_prd, contrastive_w, recons_w, nce_converge_w = model(image_batch)
+                        batchSize = image_batch.size(0)
+                        weight_prev_cycle = torch.index_select(lemniscate.memory, 0, index.view(-1))
+                        weight_prev_cycle.resize_(batchSize,args.low_dim)
+                        w_test =weight_prev_cycle.reshape(batchSize, 1,args.low_dim)
+                        x_norm = contrastive_prd.reshape(batchSize, args.low_dim, 1)
+                        x_norm = F.normalize(x_norm, dim=1).data
+                        out = torch.bmm(w_test, x_norm).squeeze(1).squeeze(1)
+                        output_P_i_v = lemniscate(contrastive_prd, index)
                         
-                    rot_p = None#torch.cat([rot_prd, rot_prd_2], dim=0).squeeze(1)
-                    rots = None#torch.cat([rot_ang_around_z_axis_batch, rot_ang_around_z_axis_batch_2], dim=0) 
-                    # rots = rots.type_as(rot_p)
-                    
-                    # print("target rots")
-                    # print(rots.shape)
-                    # print(rots.dtype)
-                    
-                    # print("predicted rots")
-                    # print(rot_p.shape)
-                    
-                    imgs_recon = recon_prd#torch.cat([recon_prd, recon_prd_2], dim=0) 
-                    imgs = image_batch#torch.cat([image_batch, image_batch_2], dim=0) 
-                    
-                    loss, (loss1, loss2, loss3) = criterion(rot_p, rots, 
-                                                                None, None, 
-                                                                imgs_recon, imgs, rot_w, contrastive_w, recons_w )
-                    
+                        loss, (loss1, loss2, loss3) = criterion(output_P_i_v, index,
+                                        recon_prd, image_batch, contrastive_w, recons_w, \
+                                        contrastive_prd, weight_prev_cycle, nce_converge_w)
+                    else:
+                        recon_prd, rot_w, contrastive_w, recons_w = model(image_batch)
+                        
+                        rot_p = None#torch.cat([rot_prd, rot_prd_2], dim=0).squeeze(1)
+                        rots = None#torch.cat([rot_ang_around_z_axis_batch, rot_ang_around_z_axis_batch_2], dim=0) 
+                        # rots = rots.type_as(rot_p)
+                        
+                        # print("target rots")
+                        # print(rots.shape)
+                        # print(rots.dtype)
+                        
+                        # print("predicted rots")
+                        # print(rot_p.shape)
+                        
+                        # imgs_recon = recon_prd#torch.cat([recon_prd, recon_prd_2], dim=0) 
+                        # imgs = image_batch#torch.cat([image_batch, image_batch_2], dim=0) 
+                        
+                        # loss, (loss1, loss2, loss3) = criterion(rot_p, rots, 
+                                                                    # None, None, 
+                                                                    # imgs_recon, imgs, rot_w, contrastive_w, recons_w )
+                        loss, (loss1, loss2, loss3) = criterion(None, None,
+                                        recon_prd, image_batch, None, None, \
+                                        None, None, None)
+                  
+                if args.contrastive:
+                    writer.add_scalar('info/P_i_v', output_P_i_v[:,0].mean().item(), iter_num)  
+                    writer.add_scalar('info/P_i_v_dash', output_P_i_v[:,1:].mean().item(), iter_num) 
+                    writer.add_scalar('info/vt_x_f', out.mean().item(), iter_num)   
+                    writer.add_scalar('info/loss_NCE', loss1, iter_num)
+                    writer.add_scalar('info/loss_convergence', loss2, iter_num)
+                    writer.add_scalar('info/loss_reconstruction', loss3, iter_num)
                 # writer.add_scalar('info/loss_rotation', loss1, iter_num)
                 # writer.add_scalar('info/loss_contrastive', loss2, iter_num)
                 # writer.add_scalar('info/loss_reconstruction', loss3, iter_num)
@@ -259,7 +380,7 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
                 image_batch, label_batch = image_batch.cuda(), label_batch.cuda(non_blocking=True).long()
                 outputs = model(image_batch)
             
-                if(use_salsa):
+                if(args.use_salsa):
                     loss_ce = ce_loss(torch.log(outputs.clamp(min=1e-8)), label_batch) + ls(outputs, label_batch.long())
                 else:
                     loss_ce = ce_loss(outputs, label_batch) + ls(F.softmax(outputs, dim=1), label_batch)
@@ -282,7 +403,7 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if(use_salsa):
+            if(args.use_salsa):
                 # step scheduler
                 scheduler.step()
             else:
@@ -292,7 +413,7 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
                 
 
             iter_num = iter_num + 1
-            if(use_salsa==False):
+            if(args.use_salsa==False):
                 writer.add_scalar('info/lr', lr_, iter_num)
             writer.add_scalar('info/loss', loss, iter_num)
 
@@ -325,61 +446,72 @@ def trainer_kitti(args, model, snapshot_path, parser, use_salsa,ARCH=None,DATA=N
             model.eval()
             with torch.no_grad():
                 
-                for index, batch_data in enumerate(valid_loader):
-                    if index % 100 == 0:
-                        print('%d validation iter processd' % index)
+                
                         
-                    if args.pretrain:
-                        (image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, \
-                        rot_ang_around_z_axis_batch,path_seq, path_name) =  batch_data
-                    
-                        image_batch = image_batch.to(device, non_blocking=True)
-                        # reduced_image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
-                        
-                        with torch.cuda.amp.autocast():
-                        
-                            recon_prd, rot_w, contrastive_w, recons_w = model(image_batch)
-                            # rot_prd_2, contrastive_prd_2, recon_prd_2, _, _, _                         = model(reduced_image_batch_2)
-                                
-                            rot_p = None#torch.cat([rot_prd, rot_prd_2], dim=0).squeeze(1)
-                            rots = None#torch.cat([rot_ang_around_z_axis_batch, rot_ang_around_z_axis_batch_2], dim=0) 
-                            # rots = rots.type_as(rot_p)
-                            
-                            # print("target rots")
-                            # print(rots.shape)
-                            # print(rots.dtype)
-                            
-                            # print("predicted rots")
-                            # print(rot_p.shape)
-                            
-                            imgs_recon = recon_prd#torch.cat([recon_prd, recon_prd_2], dim=0) 
-                            imgs = image_batch#torch.cat([image_batch, image_batch_2], dim=0) 
-                            
-                            loss, (loss1, loss2, loss3) = criterion(rot_p, rots, 
-                                                                None, None, 
-                                                                imgs_recon, imgs, rot_w, contrastive_w, recons_w )
-                                                                        
-                        val_losses.update(loss.mean().item(), args.batch_size)
-                            
+                if args.pretrain:
+                    if args.contrastive:
+                        correct_percentage,val_losses = NN(epoch_num, model,args.low_dim, NCEvalid_loader, valid_loader)
+                        writer.add_scalar('valid/NCE_val', correct_percentage, epoch_num)
                     else:
-                        (image_batch, proj_mask, label_batch, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) =  batch_data               
-                        image_batch, label_batch = image_batch.cuda(), label_batch.cuda(non_blocking=True).long()
-                        outputs = model(image_batch)
+                        for index, batch_data in enumerate(valid_loader):
+                            if index % 100 == 0:
+                                print('%d validation iter processd' % index)
+                            (image_batch, proj_mask, reduced_image_batch, reduced_proj_mask, \
+                            rot_ang_around_z_axis_batch,path_seq, path_name) =  batch_data
+                            
+                            if args.use_transunet_enc_dec:
+                                image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion
+                            else:
+                                image_batch = image_batch.to(device, non_blocking=True)
+                            
+                            with torch.cuda.amp.autocast():
+                            
+                                recon_prd, rot_w, contrastive_w, recons_w = model(image_batch)
+                                # rot_prd_2, contrastive_prd_2, recon_prd_2, _, _, _                         = model(reduced_image_batch_2)
+                                    
+                                rot_p = None#torch.cat([rot_prd, rot_prd_2], dim=0).squeeze(1)
+                                rots = None#torch.cat([rot_ang_around_z_axis_batch, rot_ang_around_z_axis_batch_2], dim=0) 
+                                # rots = rots.type_as(rot_p)
+                                
+                                # print("target rots")
+                                # print(rots.shape)
+                                # print(rots.dtype)
+                                
+                                # print("predicted rots")
+                                # print(rot_p.shape)
+                                
+                                imgs_recon = recon_prd#torch.cat([recon_prd, recon_prd_2], dim=0) 
+                                imgs = image_batch#torch.cat([image_batch, image_batch_2], dim=0) 
+                                
+                                loss, (loss1, loss2, loss3) = criterion(rot_p, rots, 
+                                                                    None, None, 
+                                                                    imgs_recon, imgs, rot_w, contrastive_w, recons_w )
+                                                                            
+                            val_losses.update(loss.mean().item(), args.batch_size)
                         
-                        # loss_ce = ce_loss(outputs, label_batch)
-            
-                        
-                        if(use_salsa):
-                            loss_ce = ce_loss(torch.log(outputs.clamp(min=1e-8)), label_batch) + ls(outputs, label_batch.long())
-                        else:
-                            loss_ce = ce_loss(outputs, label_batch) + ls(F.softmax(outputs, dim=1), label_batch)
-                        
-                        val_losses.update(loss_ce.mean().item(), args.batch_size)
-                        
-                        argmax = outputs.argmax(dim=1)
-                        
-                        evaluator.addBatch(argmax, label_batch)
-                        
+                else:
+                
+                    for index, batch_data in enumerate(valid_loader):
+                        if index % 100 == 0:
+                            print('%d validation iter processd' % index)
+                            (image_batch, proj_mask, label_batch, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) =  batch_data               
+                            image_batch, label_batch = image_batch.cuda(), label_batch.cuda(non_blocking=True).long()
+                            outputs = model(image_batch)
+                            
+                            # loss_ce = ce_loss(outputs, label_batch)
+                
+                            
+                            if(args.use_salsa):
+                                loss_ce = ce_loss(torch.log(outputs.clamp(min=1e-8)), label_batch) + ls(outputs, label_batch.long())
+                            else:
+                                loss_ce = ce_loss(outputs, label_batch) + ls(F.softmax(outputs, dim=1), label_batch)
+                            
+                            val_losses.update(loss_ce.mean().item(), args.batch_size)
+                            
+                            argmax = outputs.argmax(dim=1)
+                            
+                            evaluator.addBatch(argmax, label_batch)
+                    
                 if not args.pretrain:    
                     jaccard, class_jaccard = evaluator.getIoU()
                     
