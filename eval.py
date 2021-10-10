@@ -241,4 +241,4 @@ if __name__ == "__main__":
 
     eval = {'Noise_Robustness': eval_noise_robustness,'Uncertainity_Calculation': evaluate_uncertainity, 'eval_model_IoU': eval_model,}
     
-    eval[evaluation_type](args, net, snapshot_path,kitti_parser, args.use_salsa)
+    eval[evaluation_type](args, net, snapshot_path,kitti_parser)
