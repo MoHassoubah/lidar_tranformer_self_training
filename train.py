@@ -59,7 +59,7 @@ parser.add_argument('--use_salsa', action='store_true', default=False, help='use
 parser.add_argument('--train_fr_scratch', action='store_true', default=False, help='not use pre-trained model')
 parser.add_argument('--use_transunet_enc_dec', action='store_true', default=False, help='use the decoder and encoder blocks from the TransUnet architecture else use those from salsaNext architecture')
 parser.add_argument('--remove_Transformer', action='store_true', default=False, help='remove the Transformer from the architecture')
-parser.add_argument('--low-dim', default=300, type=int,
+parser.add_argument('--low-dim', default=512, type=int,
                     metavar='D', help='feature dimension')
 parser.add_argument('--nce-k', default=4096, type=int, #default=4096
                     metavar='K', help='number of negative samples for NCE')
