@@ -13,6 +13,7 @@ from evaluator import eval_noise_robustness, evaluate_uncertainity, eval_model
 
 from datasets.lidar_dataset.parser import Parser
 import yaml
+from KNN import KNN
 
 
 DATA_DIRECTORY = 'C:\lidar_datasets\kitti_data'     #'./data/GTA5' #should be the path of the kitti LiDAR data
@@ -22,7 +23,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
                     default=DATA_DIRECTORY, help='root dir for data')
 parser.add_argument('--restore_from', type=str,
-                    default=DATA_DIRECTORY, help='root dir for data')
+                    default=DATA_DIRECTORY, help='Which initialisation file')
 parser.add_argument('--restore_from_dir', type=str,
                     default=RESTORE_FROM_DIRECTORY, help='root dir for pre-trained weights')
 parser.add_argument('--dataset', type=str,
@@ -198,6 +199,12 @@ if __name__ == "__main__":
                           nuscenes_dataset=False,
                           evaluate = args.evaluate_noise_robustness)
                           
+                          
+    post = None
+    # if ARCH["post"]["KNN"]["use"]:
+    post = KNN(ARCH["post"]["KNN"]["params"],
+                  kitti_parser.get_n_classes())
+                          
     args.num_classes = kitti_parser.get_n_classes()
 
     if not os.path.exists(snapshot_path):
@@ -241,4 +248,4 @@ if __name__ == "__main__":
 
     eval = {'Noise_Robustness': eval_noise_robustness,'Uncertainity_Calculation': evaluate_uncertainity, 'eval_model_IoU': eval_model,}
     
-    eval[evaluation_type](args, net, snapshot_path,kitti_parser)
+    eval[evaluation_type](args, net, snapshot_path,kitti_parser, post=post)

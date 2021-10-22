@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
                     default=DATA_DIRECTORY, help='root dir for data')
 parser.add_argument('--restore_from', type=str,
-                    default=DATA_DIRECTORY, help='root dir for data')
+                    default=DATA_DIRECTORY, help='Which initialisation file')
 parser.add_argument('--restore_from_dir', type=str,
                     default=RESTORE_FROM_DIRECTORY, help='root dir for pre-trained weights')
 parser.add_argument('--dataset', type=str,

@@ -114,7 +114,7 @@ def save_img(depth_gt, depth_gt_reduced, depth_pred, proj_mask, proj_mask_reduce
     name_2_save = os.path.join(SAVE_PATH_kitti, '_'+str(i_iter) + '.png')
     cv2.imwrite(name_2_save, out)
         
-def eval_model(args, model, snapshot_path, parser):
+def eval_model(args, model, snapshot_path, parser, post=None):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
@@ -138,6 +138,7 @@ def eval_model(args, model, snapshot_path, parser):
     device = torch.device("cuda")
     ignore_classes = [0]
     evaluator = iouEval(parser.get_n_classes(),device, ignore_classes)
+    evaluator_3d = iouEval(parser.get_n_classes(),device, ignore_classes)
     
     
     #Empty the TensorBoard directory
@@ -161,13 +162,16 @@ def eval_model(args, model, snapshot_path, parser):
     # logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader), max_iterations))
     
     iou = AverageMeter()
+    iou_3d = AverageMeter()
     accu = AverageMeter()
             
     ##############################################
     ##############################################
     
     evaluator.reset()
+    evaluator_3d.reset()
     iou.reset()
+    iou_3d.reset()
     accu.reset()
     
     val_losses = AverageMeter()
@@ -181,17 +185,29 @@ def eval_model(args, model, snapshot_path, parser):
             if index % 100 == 0:
                 print('%d validation iter processd' % index)
                 
-            (inputs, proj_mask, targets, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) = batch_data
+            (inputs, proj_mask, targets, unproj_targets, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, _) = batch_data
                
                         
             inputs, targets = inputs.cuda(), targets.cuda(non_blocking=True).long()
             # reduced_image_batch = reduced_image_batch.to(device, non_blocking=True) # Apply distortion 
+            proj_range, unproj_range, p_x, p_y, unproj_targets= proj_range.cuda(), unproj_range.cuda(), p_x.cuda(), p_y.cuda(), unproj_targets.cuda()
             
             outputs = model(inputs)
             
             argmax = outputs.argmax(dim=1)
+            unproj_argmax_batch = []
+            for i in range(0,args.batch_size):
+                unproj_argmax = post(proj_range[i],
+                                            unproj_range[i],
+                                            argmax[i],
+                                            p_x[i],
+                                            p_y[i])
+                unproj_argmax_batch.append(unproj_argmax)
             
             evaluator.addBatch(argmax, targets)
+            unproj_argmax_batch_tensor=  torch.stack(unproj_argmax_batch,0)
+            
+            evaluator_3d.addBatch(unproj_argmax_batch_tensor, unproj_targets)
             
             # if iter_num % 50 == 0 and iter_num != 0:
                 # save_img(inputs, None, None, proj_mask, None, outputs, targets, parser.to_color, iter_num, eval=True)
@@ -199,9 +215,11 @@ def eval_model(args, model, snapshot_path, parser):
             
             iter_num = iter_num + 1
         jaccard, class_jaccard = evaluator.getIoU()
+        jaccard_3d, class_jaccard_3d = evaluator_3d.getIoU()
         accura = evaluator.getacc()
         
         iou.update(jaccard.item(), args.batch_size)#in_vol.size(0)) 
+        iou_3d.update(jaccard_3d.item(), args.batch_size)#in_vol.size(0)) 
         accu.update(accura.item(), args.batch_size)#in_vol.size(0)) 
 
     
@@ -209,6 +227,11 @@ def eval_model(args, model, snapshot_path, parser):
         print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
         i=i, class_str=parser.get_xentropy_class_string(i), jacc=round(jacc.item() * 100, 2)))
     print('===> mIoU: ' + str(round(iou.avg * 100, 2)))
+    
+    for i, jacc in enumerate(class_jaccard_3d):
+        print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+        i=i, class_str=parser.get_xentropy_class_string(i), jacc=round(jacc.item() * 100, 2)))
+    print('===> mIoU_3D: ' + str(round(iou_3d.avg * 100, 2)))
     
     print('===> mAccuracy: ' + str(round(accu.avg * 100, 2)))
         
@@ -220,7 +243,7 @@ def eval_model(args, model, snapshot_path, parser):
     return "model evaluation Finished!"
 
         
-def eval_noise_robustness(args, model, snapshot_path, parser):
+def eval_noise_robustness(args, model, snapshot_path, parser, post=None):
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
@@ -393,7 +416,7 @@ def compute_preds(args, net, inputs, use_salsa, use_mcdo=False):
     return outputs_mean, model_variance
 
 
-def evaluate_uncertainity(args, net, snapshot_path, parser, use_mcdo=True):
+def evaluate_uncertainity(args, net, snapshot_path, parser, post=None, use_mcdo=True):
     net.eval()
     test_loss = 0
     correct = 0
