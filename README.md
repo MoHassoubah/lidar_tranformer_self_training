@@ -43,24 +43,24 @@ The code behind this paper "Study LiDAR segmentation and  model's uncertainty us
 
 ## For evaluation the following commands are used,
 
-  ### TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture,
+  ### TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture, ([pre-trained segmentation models](https://drive.google.com/drive/folders/1BPplPzaWfqqoqv0iYHMsFM4-_ozUFvJ7?usp=sharing))
   
 ```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --evaluate_model --root_path <data path> --restore_from_dir <directory of saved the trained weights> --restore_from <file_name>```
 
   
-  ### SalsaNext network implementation,
+  ### SalsaNext network implementation,([pre-trained segmentation models](https://drive.google.com/drive/folders/18RKSfkXwWsSnQUCfUuTCsuda0gaQc8Zd?usp=sharing))
   
 ```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_salsa --evaluate_model --root_path <data path> --restore_from <file_name>```
 
-   ### Use batch normalisation layer learnt from pre-training,
+   ### Use batch normalisation layer learnt from pre-training, ([pre-trained segmentation models](https://drive.google.com/drive/folders/1zDy-_rB4z0eCYykZhoT_6SyWThgArYO_?usp=sharing))
   
 ```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --bn_pretrain --evaluate_model --root_path <data path> --restore_from_dir <directory of saved the trained weights> --restore_from <file_name>```
   
-  ### TransUnet architecture,
+  ### TransUnet architecture, ([pre-trained segmentation models](https://drive.google.com/drive/folders/1pXGka1-E6m9XsOqjIGQwYrS9Hm7feaHS?usp=sharing))
   
 ```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --evaluate_model --root_path <data path> --restore_from_dir <directory of saved the trained weights> --restore_from <file_name>```
 
-  ### TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder,
+  ### TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder, ([pre-trained segmentation models](https://drive.google.com/drive/folders/1bpxcYur43-gJjRe-Jas8QtSGoZ1dRPlJ?usp=sharing))
   
 ```$ python eval.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --root_path <data path> --remove_Transformer --evaluate_model --restore_from_dir <directory of saved the trained weights> --restore_from <file_name>```
   
