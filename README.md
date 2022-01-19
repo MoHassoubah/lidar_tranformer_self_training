@@ -2,7 +2,7 @@
 ![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/arch.png)
 The code behind this paper "Study LiDAR segmentation and  model's uncertainty using Transformer for different self-trainings"
 # Qualitative results
-![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/qualitative_results.pdf)
+[embed]https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/qualitative_results.pdf[/embed]
 Showing the 2D segmentation output for differentpre-training configurations, architectures and segmentation loss functions.
 
 ![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/with_without transformer.pdf)
