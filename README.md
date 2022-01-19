@@ -10,12 +10,12 @@ Caption: The red circles shows where in the image the TransUnet outperformed the
 
 ![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/our_vs_salsa.png)
 Caption: The red circles shows where in the image the proposed architecture (TransUnet replacing ENC &DEC with those in [2]plusbeing self-supervised pre-trained using Xavier-I & Rec-ST & BN-R-Iplususingsegmentation loss Crossentropy + Lovasz-Softmax) outperformed the SalsaNext architecture.  For examplethe SalsaNext many times miss classifies unlabeled points, this is because authors in their implementationtrained the network while ignoring the unlabeled class (this may helped in augmenting the unlabeled class butat the same time has increased the epistemic uncertainty of the model’s output).  The proposed architecturebetter classifies the sidewalk and the trunk classes.
-## Study applied on architectures:
+# Study applied on architectures:
 * TransUnet architecture.
 * TransUnet  architecture without the Transformerblock i.e.U-Net architecture where the output of the CNNencoder is passed directly to the decoder.
 * TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture .
 * SalsaNext network implementation
-## For Pre-training the following commands are used,
+# For Pre-training the following commands are used,
 ### Pre-Training TransUnet architecture using the reconstruction + contrastive loss,
   
 ```$ python train.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --root_path <data path> --pretrain --contrastive --use_transunet_enc_dec```
@@ -29,7 +29,7 @@ Caption: The red circles shows where in the image the proposed architecture (Tra
 ```$ python train.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --root_path <data path> --pretrain```
 
 
-## For Segmentation training the following commands are used,
+# For Segmentation training the following commands are used,
 ### TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture,
   
 ```$ python train.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --root_path <data path> --restore_from_dir <directory of saved the pre-trained weights> --restore_from <pre-trained file_name>```
@@ -50,7 +50,7 @@ Caption: The red circles shows where in the image the proposed architecture (Tra
   
 ```$ python train.py --vit_name R50-ViT-B_16 --batch_size <#images in batch> --use_transunet_enc_dec --remove_Transformer --root_path <data path> --restore_from_dir <directory of saved the pre-trained weights> --restore_from <pre-trained file_name>```
 
-## For evaluation the following commands are used,
+# For evaluation the following commands are used,
 
   ### TransUnet architecture but with replacing the CNNbased  encoder  and  decoder  blocks  with  those  used  inSalsaNext architecture, ([pre-trained segmentation models](https://drive.google.com/drive/folders/1BPplPzaWfqqoqv0iYHMsFM4-_ozUFvJ7?usp=sharing))
   
