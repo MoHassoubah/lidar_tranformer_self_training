@@ -8,7 +8,7 @@ Showing the 2D segmentation output for differentpre-training configurations, arc
 ![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/with_without_transformer.png)
 The red circles shows where in the image the TransUnet outperformed the U-Net architecture.For example the U-Net miss classifies between the terrain class and sidewalk classes many times.  TansUnetclassifies the Person class and the trunck class comparably better than the U-Net.
 
-![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/salsa_vs_our_best.png)
+![alt text](https://github.com/MoHassoubah/lidar_tranformer_self_training/blob/main/our_vs_salsa.png)
 The red circles shows where in the image the proposed architecture (TransUnet replacing ENC &DEC with those in [2]plusbeing self-supervised pre-trained using Xavier-I & Rec-ST & BN-R-Iplususingsegmentation loss Crossentropy + Lovasz-Softmax) outperformed the SalsaNext architecture.  For examplethe SalsaNext many times miss classifies unlabeled points, this is because authors in their implementationtrained the network while ignoring the unlabeled class (this may helped in augmenting the unlabeled class butat the same time has increased the epistemic uncertainty of the model’s output).  The proposed architecturebetter classifies the sidewalk and the trunk classes.
 ## Study applied on architectures:
 * TransUnet architecture.
